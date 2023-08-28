@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>飲食紀錄</title>
+</head>
+
+<body style="border: none;"">
+    <form action="" style="margin: 10px; display: flex; flex-direction: column; align-items: center; border: none;">
+        <!-- <label>日期</label>
+        <input type="date" id="datetime" value="" class="form-control" /> <br /> -->
+        <div style="width: 90%; display: flex;flex-direction: column;align-items: flex-start; border: none;">
+            <label style="color: #435334; font-size: 4vw; font-weight: 700;">食物</label>
+            <input style="width: 100%; min-height: 6vw;" type="text" id="food" class="form-control" />
+        </div>
+        <br />
+        <div style="width: 90%; display: flex;flex-direction: column;align-items: flex-start; border: none;">
+            <label style="color: #435334; font-size: 4vw; font-weight: 700;">感受與症狀</label>
+            <input style="width: 100%; min-height: 6vw;" type="text" id="sympton" class="form-control" />
+        </div>
+        <br />
+        <button style="font-size: 3vw; font-weight: 700; align-self: flex-end; background-color: #CEDEBD; color: #435334; padding: 10px 15px; border-radius: 5px;" class="btn btn-success btn-block" id="sure" onclick="sure()">確定</button>
+    </form>
+    <hr>
+    <style>
+        input {
+            border: none;
+            background-color: #FAF1E4;
+        }
+    </style>
+    <script src="https://static.line-scdn.net/liff/edge/2.1/sdk.js"></script>
+    <script>
+        function initializeLiff(myLiffId) {
+            liff
+                .init({
+                    liffId: myLiffId
+                })
+                .then(() => {
+                    // start to use LIFF's api
+                    // initializeApp();
+                    // alert('aaa');
+                    document.getElementById('sure').addEventListener('click', function () {
+                        liff.sendMessages([{
+                                'type': 'text',
+                                'text': "你有這麼多美金："
+                            }]).then(function () {
+                                window.alert('Message sent');
+                            }).catch(function (error) {
+                                window.alert('Error sending message: ' + error);
+                            });
+                            // liff.closeWindow();
+                    });
+                })
+                .catch((err) => {
+                    alert(err);
+                });
+        }
+
+        window.onload = () => {
+            initializeLiff('2000498096-XzeBzlB5');
+
+            document.getElementById('sure').addEventListener('click', function () {
+                liff.sendMessages([{
+                        'type': 'text',
+                        'text': "你有這麼多美金："
+                    }]).then(function () {
+                        window.alert('Message sent');
+                    }).catch(function (error) {
+                        window.alert('Error sending message: ' + error);
+                    });
+                    // liff.closeWindow();
+            });
+        }
+
+    </script>
+</body>
+
+</html>
