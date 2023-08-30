@@ -4,10 +4,10 @@ app = Flask(__name__)
 from flask import request, abort, render_template
 from linebot import  LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, PostbackTemplateAction, PostbackEvent, TextMessage, ConfirmTemplate, AudioMessage, TextSendMessage, TemplateSendMessage, ButtonsTemplate, MessageTemplateAction, CarouselTemplate, CarouselColumn
+from linebot.models import *
 
 import speech_recognition as sr
-# from pydub import AudioSegment
+from pydub import AudioSegment
 import os
 
 import datetime
@@ -43,62 +43,65 @@ def callback():
         abort(400)
     return 'OK'
 
-# @handler.add(MessageEvent, message=AudioMessage)  # 取得聲音時做的事情
-# def handle_message_Audio(event):
+@handler.add(MessageEvent, message=AudioMessage)  # 取得聲音時做的事情
+def handle_message_Audio(event):
+    is_record = var_json["is_record"]
+    is_entering = var_json["is_entering"]
+    if not is_record:
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="目前不是錄音相關環節"))
+        return
     
-#     is_record = var_json["is_record"]
-#     is_entering = var_json["is_entering"]
-#     if not is_record:
-#         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="目前不是錄音相關環節"))
-#         return
-#     #接收使用者語音訊息並存檔
-#     UserID = event.source.user_id
-#     path="./audio/"+UserID+".wav"
-#     audio_content = line_bot_api.get_message_content(event.message.id)
-#     with open(path, 'wb') as fd:
-#         for chunk in audio_content.iter_content():
-#             fd.write(chunk)        
-#     fd.close()
-    
-#     #轉檔
-#     AudioSegment.converter = '.\\ffmpeg\\bin\\ffmpeg'
-#     sound = AudioSegment.from_file_using_temporary_files(path)
-#     path = os.path.splitext(path)[0]+'.wav'
-#     sound.export(path, format="wav")
-    
-#     #辨識
-#     r = sr.Recognizer()
-#     with sr.AudioFile(path) as source:
-#         audio = r.record(source)
-#     text = r.recognize_google(audio,language='zh-Hant')
-    
-#     #回傳訊息給使用者
-#     if text:
-#         event.message.text=text
-#         # line_bot_api.reply_message(event.reply_token, TextSendMessage(text="以下是我聽到的內容\n"+text))
-#         # line_bot_api.reply_message(event.reply_token, TextSendMessage(text=text))
-#         # handle_message(event)
-#         is_record = False
-#         message = TemplateSendMessage(
-#             alt_text = "醫囑紀錄",
-#             template = ConfirmTemplate(
-#                 text = '以下是我聽到的內容\n'+text+'\n請問內容是否需再手動編輯？',
-#                 actions = [
-#                     MessageTemplateAction(label='是', text='是，我需要手動編輯'),
-#                     MessageTemplateAction(label='否', text='否，不需要手動編輯' )
-#                 ]
-#             )
-#         )
-#         line_bot_api.reply_message(event.reply_token, message)
+    try:
+        #接收使用者語音訊息並存檔
+        print(event.source)
+        UserID = event.source.user_id
+        path="./audio/"+UserID+".wav"
+        audio_content = line_bot_api.get_message_content(event.message.id)
+        with open(path, 'wb') as fd:
+            for chunk in audio_content.iter_content():
+                fd.write(chunk)        
+        fd.close()
         
-#         var_json["is_record"] = is_record
-#         var_json["is_entering"] = is_entering
-#         print(var_json)
-#         json_object = json.dumps(var_json, indent=2)
-#         with open("variables.json", "w") as outfile:
-#             outfile.write(json_object)
-#     else:
-#         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="音檔內容有誤，請重新紀錄"))
+        #轉檔
+        AudioSegment.converter = './ffmpeg/bin/ffmpeg'
+        sound = AudioSegment.from_file_using_temporary_files(path)
+        path = os.path.splitext(path)[0]+'.wav'
+        sound.export(path, format="wav")
+        
+        #辨識
+        r = sr.Recognizer()
+        with sr.AudioFile(path) as source:
+            audio = r.record(source)
+        text = r.recognize_google(audio,language='zh-Hant')
+
+        #回傳訊息給使用者
+        if text:
+            event.message.text=text
+            is_record = False
+            message = TemplateSendMessage(
+                alt_text = "醫囑紀錄",
+                template = ConfirmTemplate(
+                    text = '以下是我聽到的內容\n「'+text+'」\n請問內容是否需再手動編輯？',
+                    actions = [
+                        MessageTemplateAction(label='是，我需要手動編輯', text='重新編輯醫囑紀錄'),
+                        # PostbackTemplateAction( label='是，我需要手動編輯', data='action=rerecord'),
+                        PostbackTemplateAction( label='否，不需要手動編輯', data='action=norercord')
+                    ]
+                )
+            )
+            
+            var_json["is_record"] = is_record
+            var_json["is_entering"] = is_entering
+            print(var_json)
+            json_object = json.dumps(var_json, indent=2)
+            with open("variables.json", "w") as outfile:
+                outfile.write(json_object)
+        else:
+            message = TextSendMessage(text="音檔內容有誤，請重新紀錄")
+    except:
+        message = TextSendMessage(text="錄製過程出現錯誤，請重新紀錄")
+    line_bot_api.reply_message(event.reply_token, message)
+    
 
 
 @handler.add(MessageEvent, message=TextMessage)
@@ -111,7 +114,7 @@ def handle_message(event):
         message = TemplateSendMessage(
             alt_text = "醫囑紀錄",
             template = ConfirmTemplate(
-                text = '是否紀錄在今天的醫囑？',
+                text = '以下是醫囑內容\n「'+txt+'」\n是否紀錄在今天的醫囑？',
                 actions = [
                     MessageTemplateAction(label='是', text='是，紀錄在今天的醫囑'),
                     MessageTemplateAction(label='否', text='否' )
@@ -119,18 +122,18 @@ def handle_message(event):
             )
         )
         line_bot_api.reply_message(event.reply_token, message)
-    elif txt == "飲食風險查詢" or txt == "症狀查詢":
+    elif txt == "對話小百科":
         message = TemplateSendMessage( alt_text='轉盤樣板',
             template=CarouselTemplate(
                 columns=[
                     CarouselColumn(
-                        title='對話小百科',
-                        text='飲食風險查詢',
+                        title='飲食健康指南',
+                        text='挑選適合的飲食，改善症狀，提升生活品質。',
                         actions=[MessageTemplateAction(label=t, text=t) for t in list(comm_json.keys())[0:3]]
                     ),
                     CarouselColumn(
-                        title='對話小百科',
-                        text='症狀查詢',
+                        title='洞悉胃食道逆流',
+                        text='深入了解胃食道逆流的不同層面',
                         actions=[MessageTemplateAction(label=t, text=t) for t in list(comm_json.keys())[3:6]]
                     )
                 ]
@@ -141,12 +144,12 @@ def handle_message(event):
         print(comm_json[txt])
         for para in comm_json[txt]:
             line_bot_api.reply_message(event.reply_token,TextSendMessage(text=para.replace('\\n', '\n\n')))
-    elif txt == "醫囑紀錄":
+    elif txt == "醫囑紀錄" or txt == "重新編輯醫囑紀錄":
         message = TemplateSendMessage(
             alt_text = "醫囑紀錄",
             template = ButtonsTemplate(
                 title = '醫囑紀錄',
-                text = '請請問您要用什麼方式紀錄？',
+                text = '請問您要用什麼方式紀錄？',
                 actions = [MessageTemplateAction(label='語音', text='語音'), MessageTemplateAction(label='文字', text='文字' )]
             )
         )
@@ -175,18 +178,16 @@ def handle_message(event):
         )
         line_bot_api.reply_message(event.reply_token, message)
     elif txt == "病友分享":
-        message = TemplateSendMessage( alt_text='轉盤樣板',
+        ks = list(people_json.keys())
+        vs = [people_json[k] for k in ks]
+        print(ks, vs)
+        message = TemplateSendMessage( alt_text='病友分享',
             template=CarouselTemplate(
                 columns=[
                     CarouselColumn(
                         title='病友分享',
-                        text='你想找什麼樣症狀的病友文章呢？',
+                        text='查看其他病友怎麼克服困難，改善症狀的',
                         actions=[MessageTemplateAction(label=t, text=t) for t in list(people_json.keys())[0:3]]
-                    ),
-                    CarouselColumn(
-                        title='病友分享',
-                        text='你想找什麼樣症狀的病友文章呢？',
-                        actions=[MessageTemplateAction(label=t, text=t) for t in list(people_json.keys())[3:6]]
                     )
                 ]
             )
@@ -200,28 +201,33 @@ def handle_message(event):
             template=CarouselTemplate(
                 columns=[
                     CarouselColumn(
-                        title='一號',
+                        title='李婉萍營養師',
                         text='#可預約一~五 8:00-9:00',
+                        thumbnail_image_url='https://i.imgur.com/Qid7CNt.png',
                         actions=[PostbackTemplateAction( label='立即預約', data='action=reserve')]
                     ),
                     CarouselColumn(
-                        title='二號',
+                        title='余朱青營養師',
                         text='#可預約一~五 8:00-9:00',
+                        thumbnail_image_url='https://i.imgur.com/TgEqNgG.jpg',
                         actions=[PostbackTemplateAction( label='立即預約', data='action=reserve')]
                     ),
                     CarouselColumn(
-                        title='三號',
+                        title='郭環棻營養師',
                         text='#可預約一~五 8:00-9:00',
+                        thumbnail_image_url='https://i.imgur.com/GZYD7Yh.jpg',
                         actions=[PostbackTemplateAction( label='立即預約', data='action=reserve')]
                     ),
                     CarouselColumn(
-                        title='四號',
+                        title='曾依田營養師',
                         text='#可預約一~五 8:00-9:00',
+                        thumbnail_image_url='https://i.imgur.com/OXe5KQy.jpg',
                         actions=[PostbackTemplateAction( label='立即預約', data='action=reserve')]
                     ),
                     CarouselColumn(
-                        title='五號',
+                        title='嫚嫚營養師',
                         text='#可預約一~五 8:00-9:00',
+                        thumbnail_image_url='https://i.imgur.com/KRy2sG7.jpg',
                         actions=[PostbackTemplateAction( label='立即預約', data='action=reserve')]
                     )
                 ]
@@ -244,6 +250,20 @@ def handle_postback(event):
     backdata = dict(parse_qsl(event.postback.data)) #取得Postback資料
     if backdata.get('action') == 'reserve':
         line_bot_api.reply_message(event.reply_token,TextSendMessage(text='預約成功'))
+    # elif backdata.get('action') == "rerecord":
+    #     line_bot_api.reply_message(event.reply_token, TextSendMessage(text='重新編輯醫囑紀錄'))
+    elif backdata.get('action') == "norecord":
+        message = TemplateSendMessage(
+            alt_text = "醫囑紀錄",
+            template = ConfirmTemplate(
+                text = '是否紀錄在今天的醫囑？',
+                actions = [
+                    MessageTemplateAction(label='是', text='是，紀錄在今天的醫囑'),
+                    MessageTemplateAction(label='否', text='否' )
+                ]
+            )
+        )
+        line_bot_api.reply_message(event.reply_token, message)
 
 # @handler.add(MessageEvent, message=TextMessage)
 # def handle_message(event):
